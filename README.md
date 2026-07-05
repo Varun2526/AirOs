@@ -76,7 +76,7 @@ Each directory contains a `README.md` explaining its purpose, contents, and anti
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/AirOS.git
+git clone https://github.com/Varun2526/AirOS.git
 cd AirOS
 
 # Set up development environment
