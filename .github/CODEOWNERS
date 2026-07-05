@@ -1,0 +1,20 @@
+# AirOS CODEOWNERS
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Each line is a file pattern followed by one or more owners.
+# Order matters — later rules override earlier ones.
+#
+# As a solo developer, you own everything. As the team grows,
+# assign ownership to specific areas.
+
+# Default owner for everything
+*                       @varun
+
+# Core application
+# src/                  @varun
+
+# AI/ML research
+# research/             @varun
+
+# Documentation
+# docs/                 @varun

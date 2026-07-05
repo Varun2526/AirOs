@@ -1,0 +1,32 @@
+# EditorConfig — https://editorconfig.org
+
+root = true
+
+# Defaults for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown — trailing whitespace is significant
+[*.md]
+trim_trailing_whitespace = false
+
+# YAML — 2-space indent is standard
+[*.{yml,yaml}]
+indent_size = 2
+
+# JSON / TOML
+[*.{json,toml}]
+indent_size = 2
+
+# Makefile — must use tabs
+[Makefile]
+indent_style = tab
+
+# Shell scripts
+[*.sh]
+indent_size = 2

@@ -1,0 +1,106 @@
+# ===========================
+# AirOS .gitignore
+# ===========================
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+pip-wheel-metadata/
+.eggs/
+
+# ----- Virtual Environments -----
+.venv/
+venv/
+env/
+ENV/
+
+# ----- IDE / Editor -----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# ----- OS Files -----
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# ----- Jupyter Notebooks -----
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ----- Logs -----
+logs/
+*.log
+
+# ----- Data & Models (large files) -----
+data/raw/*
+data/processed/*
+models/*
+recordings/*
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!models/.gitkeep
+!recordings/.gitkeep
+!data/README.md
+!models/README.md
+!recordings/README.md
+!logs/README.md
+
+# ----- ML / Training Artifacts -----
+*.ckpt
+*.pt
+*.pth
+*.h5
+*.hdf5
+*.onnx
+*.tflite
+*.pb
+*.savedmodel/
+wandb/
+mlruns/
+*.tfevents*
+
+# ----- Environment & Secrets -----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ----- Coverage & Testing -----
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+.mypy_cache/
+
+# ----- Build Artifacts -----
+*.o
+*.a
+*.dylib
+*.dll
+
+# ----- Miscellaneous -----
+*.bak
+*.tmp
+*.temp
+.cache/
