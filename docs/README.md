@@ -11,6 +11,8 @@ docs/
 ├── adr/                # Architecture Decision Records
 │   ├── template.md     # ADR template
 │   └── 0001-*.md       # Individual decisions
+├── engineering/        # Learning & technical concept references
+│   └── 01-hand-landmarks-and-coordinate-system.md
 ├── architecture.md     # System architecture overview
 └── README.md
 ```
@@ -22,6 +24,7 @@ docs/
 - API documentation
 - Design documents
 - Architecture Decision Records (ADRs) in `docs/adr/`
+- Engineering concept references in `docs/engineering/`
 - User guides and tutorials
 
 ## What Does NOT Belong Here
