@@ -25,6 +25,8 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 | **Action Mapping** | Map gestures to system actions | Configuration, customisability |
 | **OS Control** | Execute system-level actions | Platform compatibility, permissions |
 
+> The pipeline between stages uses a producer–consumer model with bounded queues, a Recorder for raw data persistence, and a Replay system for offline processing. For full details, see [Engineering Document 02: Data Pipeline](engineering/02-data-pipeline.md).
+
 ## Design Principles
 
 1. **Each stage is a module** — Stages communicate through well-defined interfaces. Any stage can be swapped without affecting others.
@@ -39,3 +41,7 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 ## Key Technical Decisions
 
 See [Architecture Decision Records](adr/) for the reasoning behind significant technical choices.
+
+## Engineering Handbook
+
+For foundational concepts — landmarks, coordinate systems, data pipelines, producer/consumer patterns, and engineering principles — see the [Engineering Handbook](engineering/).

@@ -11,8 +11,9 @@ docs/
 ├── adr/                # Architecture Decision Records
 │   ├── template.md     # ADR template
 │   └── 0001-*.md       # Individual decisions
-├── engineering/        # Learning & technical concept references
-│   └── 01-hand-landmarks-and-coordinate-system.md
+├── engineering/        # Engineering Handbook — technical concept references
+│   ├── 01-hand-landmarks-and-coordinate-system.md
+│   └── 02-data-pipeline.md
 ├── architecture.md     # System architecture overview
 └── README.md
 ```
@@ -33,6 +34,26 @@ docs/
 - **Inline code documentation** → Keep in source files in `src/`
 - **README files for specific directories** → Keep in their respective directories
 - **Auto-generated API docs** → Generate into `docs/api/` but don't hand-write there
+
+## Engineering Handbook
+
+AirOS is documented as an engineering handbook that grows alongside the implementation. Each document explains foundational concepts, engineering trade-offs, and design reasoning — not just what was built, but *why*.
+
+| # | Document | Status |
+|---|---|---|
+| 01 | [Hand Landmarks and Coordinate System](engineering/01-hand-landmarks-and-coordinate-system.md) | ✅ Complete |
+| 02 | [Data Pipeline — Recording, Replay, and Engineering Thinking](engineering/02-data-pipeline.md) | ✅ Complete |
+| 03 | Recorder and Replay Architecture | ⬜ Planned |
+| 04 | Real-Time Systems | ⬜ Planned |
+| 05 | Filtering and Smoothing | ⬜ Planned |
+| 06 | Feature Extraction | ⬜ Planned |
+| 07 | Rule-Based Gesture Recognition | ⬜ Planned |
+| 08 | Machine Learning Fundamentals | ⬜ Planned |
+| 09 | Training and Evaluation | ⬜ Planned |
+| 10 | Performance Optimization | ⬜ Planned |
+| 11 | Production Readiness | ⬜ Planned |
+
+See [`docs/engineering/`](engineering/) for the full handbook.
 
 ## Architecture Decision Records (ADRs)
 
