@@ -13,7 +13,8 @@ docs/
 │   └── 0001-*.md       # Individual decisions
 ├── engineering/        # Engineering Handbook — technical concept references
 │   ├── 01-hand-landmarks-and-coordinate-system.md
-│   └── 02-data-pipeline.md
+│   ├── 02-data-pipeline.md
+│   └── 03-recorder-and-replay.md
 ├── architecture.md     # System architecture overview
 └── README.md
 ```
@@ -43,7 +44,7 @@ AirOS is documented as an engineering handbook that grows alongside the implemen
 |---|---|---|
 | 01 | [Hand Landmarks and Coordinate System](engineering/01-hand-landmarks-and-coordinate-system.md) | ✅ Complete |
 | 02 | [Data Pipeline — Recording, Replay, and Engineering Thinking](engineering/02-data-pipeline.md) | ✅ Complete |
-| 03 | Recorder and Replay Architecture | ⬜ Planned |
+| 03 | [Recorder and Replay Architecture](engineering/03-recorder-and-replay.md) | 🟡 In Progress |
 | 04 | Real-Time Systems | ⬜ Planned |
 | 05 | Filtering and Smoothing | ⬜ Planned |
 | 06 | Feature Extraction | ⬜ Planned |

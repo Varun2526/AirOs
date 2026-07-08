@@ -36,7 +36,11 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 
 ## Module Boundaries
 
-<!-- TODO: Define module interfaces as the implementation begins -->
+### Recorder
+
+The Recorder is a passive infrastructure module responsible for preserving factual observations without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
+
+<!-- TODO: Define additional module interfaces as the implementation continues -->
 
 ## Key Technical Decisions
 

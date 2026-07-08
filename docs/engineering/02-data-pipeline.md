@@ -866,7 +866,7 @@ Use these questions to test retention and understanding. If any answer is unclea
 |---|---|---|
 | **01** | Hand Landmarks and Coordinate System | ✅ Complete |
 | **02** (this document) | Data Pipeline — Recording, Replay, and Engineering Thinking | ✅ Complete |
-| **03** | Recorder and Replay Architecture | ⬜ Planned |
+| **03** | Recorder and Replay Architecture | 🟡 In Progress |
 | **04** | Real-Time Systems — Latency budgets and frame timing | ⬜ Planned |
 | **05** | Filtering and Smoothing — Noise reduction techniques | ⬜ Planned |
 | **06** | Feature Extraction — Deriving gesture features from landmarks | ⬜ Planned |
@@ -882,6 +882,9 @@ Use these questions to test retention and understanding. If any answer is unclea
 | 3 | Separate data collection from data processing | Document 02 |
 | 4 | In real-time systems, freshness is often more valuable than completeness | Document 02 |
 | 5 | Every module should have exactly one responsibility | Document 02 |
+| 6 | Infrastructure modules preserve facts; they do not make decisions | Document 03 |
+| 7 | A module should own only the information required by its responsibility | Document 03 |
+| 8 | Privacy-preserving transformations belong to downstream processing modules, not to data capture modules | Document 03 |
 
 ---
 
