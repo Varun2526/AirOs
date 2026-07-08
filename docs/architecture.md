@@ -1,6 +1,8 @@
 # AirOS Architecture
 
 > This document describes the high-level architecture of AirOS. It is a living document that will evolve as the system grows.
+>
+> The architecture intentionally presents multiple levels of abstraction. The product overview explains what AirOS does, while the engineering architecture explains how the system is structured internally.
 
 ## System Overview
 
@@ -41,7 +43,7 @@ graph TD
     CAM["📷 Camera Input"] --> PERC["🧠 Perception<br/>(MediaPipe)"]
 
     PERC --> REC["💾 Recorder"]
-    PERC --> LS["Landmark Stream"]
+    PERC --> LS["Landmark Stream<br/>(interface)"]
 
     REC --> DISK["📁 Recordings"]
     DISK --> REPLAY["🔁 Replay"]
@@ -81,11 +83,11 @@ graph TD
 | Property | Description |
 |---|---|
 | **Landmark Stream** | The common interface that both Perception (live) and Replay (offline) produce into. Any module that consumes landmarks reads from this stream — it does not know or care whether the data is live or replayed. If a future module needs landmark data, it subscribes to the stream without modifying Replay or Perception. |
-| **Recorder fork** | The Recorder forks **directly from Perception**, not from the processing queue. This ensures the Recorder never misses frames due to processing lag. The Recorder captures facts immediately; the processing path may buffer or delay work. |
+| **Recorder fork** | The Recorder forks **directly from Perception**, not from the processing queue. This ensures the Recorder never misses frames due to processing lag. The Recorder captures observations immediately; the processing path may buffer or delay work. |
 | **Infrastructure layer** | The Recorder, Recordings, and Replay system exist to support offline analysis. They do not affect the live processing path. |
 | **Processing layer** | The Gesture Engine, Action Mapping, and OS Control form the real-time processing path that translates landmarks into desktop actions. |
 | **Bounded queue** | Sits only on the processing path, between the Landmark Stream and the Gesture Engine. Decouples stream production speed from processing consumption speed. Prevents memory growth; prioritises fresh data over complete data. |
-| **Recorder passivity** | The Recorder writes raw facts to disk. It does not filter, smooth, or interpret data. See [Document 03](engineering/03-recorder-and-replay.md). |
+| **Recorder passivity** | The Recorder writes the original observations emitted by Perception to disk. It does not filter, smooth, or interpret data. See [Document 03](engineering/03-recorder-and-replay.md). |
 
 > For the producer–consumer model, bounded queues, and freshness-over-completeness trade-off, see [Engineering Document 02: Data Pipeline](engineering/02-data-pipeline.md). For the Recorder's responsibilities and data schema, see [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
 
@@ -103,11 +105,35 @@ graph TD
 
 The Perception stage wraps the hand detection and landmark extraction model (currently MediaPipe). It receives image frames and produces structured landmark data with confidence scores and handedness. If AirOS migrates to a different model, only this module changes — all downstream modules depend on the landmark format, not on MediaPipe specifically.
 
+The Landmark Stream is the stable contract between Perception and downstream consumers. Future perception implementations must preserve this contract even if the underlying CV model changes.
+
 ### Recorder
 
-The Recorder is a passive infrastructure module responsible for preserving factual observations without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
+The Recorder is a passive infrastructure module responsible for preserving the original observations emitted by the Perception stage, without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
 
-<!-- TODO: Define additional module interfaces as the implementation continues -->
+### Replay
+
+The Replay module reads recorded sessions from disk and emits landmark data into the Landmark Stream. It produces the same interface as live Perception — downstream consumers cannot distinguish live from replayed data.
+
+<!-- TODO: Expand when Replay is implemented -->
+
+### Gesture Engine
+
+The Gesture Engine consumes landmark data from the Landmark Stream (via the Bounded Queue) and classifies hand poses into named gestures.
+
+<!-- TODO: Expand when Gesture Engine is implemented -->
+
+### Action Mapping
+
+Action Mapping translates recognised gestures into system actions (e.g., mouse move, click, scroll). Mappings are driven by configuration, not hardcoded.
+
+<!-- TODO: Expand when Action Mapping is implemented -->
+
+### OS Control
+
+OS Control executes system-level input events on the host platform. Currently targets macOS. If multi-platform support is added, this module will be refactored and the rename considered via an ADR.
+
+<!-- TODO: Expand when OS Control is implemented -->
 
 ## Key Technical Decisions
 
