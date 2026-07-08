@@ -8,9 +8,11 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 
 ## Pipeline Architecture
 
+The following diagram shows the **product-level** pipeline — the simplest way to understand what AirOS does:
+
 ```
 ┌──────────┐    ┌───────────────┐    ┌────────────────────┐    ┌────────────────┐    ┌────────────┐
-│  Camera   │───▶│ Hand Detection │───▶│ Gesture Recognition │───▶│ Action Mapping │───▶│ OS Control │
+│  Camera   │───▶│  Perception    │───▶│ Gesture Recognition │───▶│ Action Mapping │───▶│ OS Control │
 │  Input    │    │  (CV/ML)       │    │  (Classification)   │    │  (Config)      │    │ (Platform) │
 └──────────┘    └───────────────┘    └────────────────────┘    └────────────────┘    └────────────┘
 ```
@@ -20,12 +22,72 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 | Stage | Responsibility | Key Concerns |
 |---|---|---|
 | **Camera Input** | Capture frames from webcam | Frame rate, resolution, device selection |
-| **Hand Detection** | Locate hands and extract landmarks | Model accuracy, latency, GPU/CPU |
+| **Perception** | Detect hands, extract landmarks, estimate 3D coordinates, compute confidence, identify handedness | Model accuracy, latency, GPU/CPU |
 | **Gesture Recognition** | Classify hand poses into named gestures | Gesture vocabulary, confidence thresholds |
 | **Action Mapping** | Map gestures to system actions | Configuration, customisability |
 | **OS Control** | Execute system-level actions | Platform compatibility, permissions |
 
-> The pipeline between stages uses a producer–consumer model with bounded queues, a Recorder for raw data persistence, and a Replay system for offline processing. For full details, see [Engineering Document 02: Data Pipeline](engineering/02-data-pipeline.md).
+> [!NOTE]
+> This stage was previously named "Hand Detection." It was renamed to "Perception" because the stage does significantly more than detection — it extracts 21 landmarks, estimates 3D coordinates, computes per-landmark confidence scores, and identifies handedness. "Perception" is the standard term in robotics and autonomous systems for the subsystem that converts raw sensor data into structured world representations.
+
+## Engineering Architecture
+
+The product-level diagram above shows *what* AirOS does. The diagram below shows *how* data flows through the system, including infrastructure modules that support replay, debugging, benchmarking, and future machine learning.
+
+Recorder and Replay form AirOS's **engineering infrastructure**. They are not required for live operation, but they enable debugging, benchmarking, regression testing, reproducibility, and future machine learning workflows.
+
+```mermaid
+graph TD
+    CAM["📷 Camera Input"] --> PERC["🧠 Perception<br/>(MediaPipe)"]
+
+    PERC --> REC["💾 Recorder"]
+    PERC --> LS["Landmark Stream"]
+
+    REC --> DISK["📁 Recordings"]
+    DISK --> REPLAY["🔁 Replay"]
+    REPLAY --> LS
+
+    LS --> QUEUE["Bounded Queue"]
+    QUEUE --> GE["⚙️ Gesture Engine"]
+    GE --> AM["🗺️ Action Mapping"]
+    AM --> OS["🖥️ OS Control"]
+
+    subgraph Infrastructure Layer
+        REC
+        DISK
+        REPLAY
+    end
+
+    subgraph Processing Layer
+        GE
+        AM
+        OS
+    end
+
+    style CAM fill:#6c757d,stroke:#545b62,color:#fff
+    style PERC fill:#4a9eff,stroke:#2d7ad4,color:#fff
+    style LS fill:#e9ecef,stroke:#6c757d,color:#000
+    style REC fill:#17a2b8,stroke:#117a8b,color:#fff
+    style DISK fill:#17a2b8,stroke:#117a8b,color:#fff
+    style REPLAY fill:#17a2b8,stroke:#117a8b,color:#fff
+    style QUEUE fill:#ffc107,stroke:#d4a106,color:#000
+    style GE fill:#28a745,stroke:#1e7e34,color:#fff
+    style AM fill:#28a745,stroke:#1e7e34,color:#fff
+    style OS fill:#28a745,stroke:#1e7e34,color:#fff
+```
+
+### Key Architectural Properties
+
+| Property | Description |
+|---|---|
+| **Landmark Stream** | The common interface that both Perception (live) and Replay (offline) produce into. Any module that consumes landmarks reads from this stream — it does not know or care whether the data is live or replayed. If a future module needs landmark data, it subscribes to the stream without modifying Replay or Perception. |
+| **Recorder fork** | The Recorder forks **directly from Perception**, not from the processing queue. This ensures the Recorder never misses frames due to processing lag. The Recorder captures facts immediately; the processing path may buffer or delay work. |
+| **Infrastructure layer** | The Recorder, Recordings, and Replay system exist to support offline analysis. They do not affect the live processing path. |
+| **Processing layer** | The Gesture Engine, Action Mapping, and OS Control form the real-time processing path that translates landmarks into desktop actions. |
+| **Bounded queue** | Sits only on the processing path, between the Landmark Stream and the Gesture Engine. Decouples stream production speed from processing consumption speed. Prevents memory growth; prioritises fresh data over complete data. |
+| **Recorder passivity** | The Recorder writes raw facts to disk. It does not filter, smooth, or interpret data. See [Document 03](engineering/03-recorder-and-replay.md). |
+
+> For the producer–consumer model, bounded queues, and freshness-over-completeness trade-off, see [Engineering Document 02: Data Pipeline](engineering/02-data-pipeline.md). For the Recorder's responsibilities and data schema, see [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
 
 ## Design Principles
 
@@ -33,8 +95,13 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 2. **Configuration over code** — Gesture-to-action mappings are config, not hardcoded.
 3. **Research ≠ Production** — Experiments happen in `research/`. Proven approaches graduate to `src/`.
 4. **Measure everything** — Latency and accuracy benchmarks are first-class citizens.
+5. **Infrastructure supports processing** — The Recorder and Replay system exist to make the processing layer debuggable, benchmarkable, and trainable.
 
 ## Module Boundaries
+
+### Perception
+
+The Perception stage wraps the hand detection and landmark extraction model (currently MediaPipe). It receives image frames and produces structured landmark data with confidence scores and handedness. If AirOS migrates to a different model, only this module changes — all downstream modules depend on the landmark format, not on MediaPipe specifically.
 
 ### Recorder
 
