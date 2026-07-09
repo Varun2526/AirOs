@@ -866,7 +866,7 @@ Use these questions to test retention and understanding. If any answer is unclea
 |---|---|---|
 | **01** | Hand Landmarks and Coordinate System | ✅ Complete |
 | **02** (this document) | Data Pipeline — Recording, Replay, and Engineering Thinking | ✅ Complete |
-| **03** | Recorder and Replay Architecture | 🟡 In Progress |
+| **03** | Recorder and Replay Architecture | ✅ Complete |
 | **04** | Real-Time Systems — Latency budgets and frame timing | ⬜ Planned |
 | **05** | Filtering and Smoothing — Noise reduction techniques | ⬜ Planned |
 | **06** | Feature Extraction — Deriving gesture features from landmarks | ⬜ Planned |
@@ -885,6 +885,16 @@ Use these questions to test retention and understanding. If any answer is unclea
 | 6 | Infrastructure modules preserve facts; they do not make decisions | Document 03 |
 | 7 | A module should own only the information required by its responsibility | Document 03 |
 | 8 | Privacy-preserving transformations belong to downstream processing modules, not to data capture modules | Document 03 |
+| 9 | Store information at the lowest frequency at which it changes | Document 03 |
+| 10 | A recording session should represent one coherent experiment | Document 03 |
+| 11 | Recordings are long-term engineering assets, not temporary debug files | Document 03 |
+| 12 | A recording should be understandable without reading the implementation | Document 03 |
+| 13 | A recording format should evolve through extension rather than replacement whenever possible | Document 03 |
+| 14 | The same recording should always reproduce the same observations | Document 03 |
+| 15 | Replay should preserve history, not merely reproduce data | Document 03 |
+| 16 | Replay should be indistinguishable from live perception to downstream modules | Document 03 |
+| 17 | Infrastructure modules execute policies; they should not define them | Document 03 |
+| 18 | Replay speed changes the rate of playback, not the recorded history | Document 03 |
 
 ---
 

@@ -833,7 +833,7 @@ For completeness, the full set of 21 MediaPipe hand landmarks:
 |---|---|---|
 | **01** (this document) | Hand Landmarks and Coordinate System | ✅ Complete |
 | **02** | Data Pipeline — Recording, Replay, and Engineering Thinking | ✅ Complete |
-| **03** | Recorder and Replay Architecture | 🟡 In Progress |
+| **03** | Recorder and Replay Architecture | ✅ Complete |
 | **04** | Real-Time Systems — Latency budgets and frame timing | ⬜ Planned |
 | **05** | Filtering and Smoothing — Noise reduction techniques | ⬜ Planned |
 | **06** | Feature Extraction — Deriving gesture features from landmarks | ⬜ Planned |
