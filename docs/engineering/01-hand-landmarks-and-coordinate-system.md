@@ -282,12 +282,11 @@ graph LR
 
 ## 5. Engineering Principle: Minimum Useful Information
 
-> [!IMPORTANT]
 > ### Engineering Principle #1
 >
-> *"Engineering is not about collecting the maximum amount of data. Engineering is about collecting the **minimum amount of useful information** required to solve the problem reliably."*
-
-This principle appears everywhere in engineering, not just in computer vision:
+> ### Engineering Principle #1
+>
+> **See [Engineering Principle #1: Minimum Useful Information](../engineering-principles.md#1-minimum-useful-information)**
 
 | Domain | Maximum Data Approach | Minimum Useful Information Approach |
 |---|---|---|

@@ -6,7 +6,7 @@
 
 | Field | Value |
 |---|---|
-| **Document Version** | v2.0 |
+| **Document Version** | v3.0 |
 | **Last Updated** | 2026-07-09 |
 | **Author** | Varun |
 | **Status** | Living Document |
@@ -31,7 +31,14 @@ After reading this document, the reader should be able to:
 - Explain why recording formats should evolve through extension rather than replacement
 - Explain why anonymization and privacy transformations do not belong in the Recorder
 - Describe the Replay module's architecture: Landmark Stream interface, timestamp preservation, and policy-based speed control
-- Apply Engineering Principles #6 through #18 to system design decisions
+- Apply Engineering Principles #6 through #15 to system design decisions
+
+### Scope and Assumptions
+
+- This document covers the Recorder and Replay modules only. It does not cover the Gesture Engine, Action Mapping, or OS Control.
+- Assumes single-hand detection per frame (AirOS V1). Multi-hand recording is a future extension.
+- Assumes local filesystem storage. Network or cloud storage is out of scope.
+- Assumes a single user per session.
 
 ---
 
@@ -66,17 +73,13 @@ The Recorder is the simplest module in the AirOS pipeline — and precisely beca
 12. [Recording Strategies](#12-recording-strategies)
 13. [Privacy vs. Storage Trade-offs](#13-privacy-vs-storage-trade-offs)
 14. [Why Anonymization Is Not the Recorder's Responsibility](#14-why-anonymization-is-not-the-recorders-responsibility)
-15. [Three Categories of Recorded Information](#15-three-categories-of-recorded-information)
-16. [Recording Session Coherence](#16-recording-session-coherence)
-17. [Metadata Immutability](#17-metadata-immutability)
-18. [Recording Format Evolution](#18-recording-format-evolution)
-19. [Recordings as Long-Term Engineering Assets](#19-recordings-as-long-term-engineering-assets)
-20. [Replay Architecture](#20-replay-architecture)
-21. [Engineering Principles Introduced](#21-engineering-principles-introduced)
-22. [Common Mistakes](#22-common-mistakes)
-23. [Key Takeaways](#23-key-takeaways)
-24. [Questions for Revision](#24-questions-for-revision)
-25. [Related Documents](#25-related-documents)
+15. [Recordings as Long-Term Engineering Assets](#15-recordings-as-long-term-engineering-assets)
+16. [Replay Architecture](#16-replay-architecture)
+17. [Engineering Principles Introduced](#17-engineering-principles-introduced)
+18. [Common Mistakes](#18-common-mistakes)
+19. [Key Takeaways](#19-key-takeaways)
+20. [Questions for Revision](#20-questions-for-revision)
+21. [Related Documents](#21-related-documents)
 
 ---
 
@@ -90,7 +93,7 @@ The Recorder intercepts this data and **persists it** before it is consumed, cre
 
 ```mermaid
 graph LR
-    MP["MediaPipe<br/>Produces landmarks"] --> FORK["Fork Point"]
+    PERC["Perception<br/>Produces landmarks"] --> FORK["Fork Point"]
     FORK --> GE["Gesture Engine<br/>Consumes and discards"]
     FORK --> REC["Recorder<br/>Persists to disk"]
     REC --> DISK["💾 Permanent Record"]
@@ -217,6 +220,70 @@ This rule is absolute. If something requires an algorithm to produce it, it is a
 
 ## 4. What the Recorder Owns
 
+The Recorder stores three distinct categories of information. Understanding the boundaries between them prevents a common architectural mistake: mixing concerns that change at different frequencies.
+
+### Category 1: Observations
+
+Observations are the **per-frame data** emitted by the Perception stage. They change every frame — every 33 milliseconds at 30 FPS.
+
+| Example | Changes Every |
+|---|---|
+| Landmark coordinates | Frame |
+| Per-landmark confidence | Frame |
+| Handedness | Frame |
+| Hand detection score | Frame |
+| Frame timestamp | Frame |
+| Frame number | Frame |
+
+### Category 2: Metadata
+
+Metadata describes the **recording session itself**. It is established once — at the start of a session — and does not change during the session.
+
+| Example | Changes Every |
+|---|---|
+| Session ID | Never (per session) |
+| Start time | Never (per session) |
+| End time | Set once at session end |
+| Camera resolution | Never (per session) |
+| Recorder format version | Never (per session) |
+| MediaPipe version | Never (per session) |
+| AirOS version | Never (per session) |
+
+### Category 3: Configuration
+
+Configuration describes **how** the recording was performed. Like metadata, it is established at session start.
+
+| Example | Changes Every |
+|---|---|
+| Target FPS | Never (per session) |
+| Selected camera device | Never (per session) |
+| Video recording enabled | Never (per session) |
+| Recording strategy | Never (per session) |
+
+### Why the Categories Matter
+
+```mermaid
+graph TD
+    OBS["Observations<br/>Change every frame<br/>~33ms"] --> FRAME["Stored per frame<br/>in landmarks.jsonl"]
+    META["Metadata<br/>Change once per session"] --> SESS["Stored once<br/>in metadata.json"]
+    CONF["Configuration<br/>Change once per session"] --> SESS
+
+    style OBS fill:#28a745,stroke:#1e7e34,color:#fff
+    style META fill:#4a9eff,stroke:#2d7ad4,color:#fff
+    style CONF fill:#ffc107,stroke:#d4a106,color:#000
+```
+
+The engineering value of this separation is **storage efficiency** and **conceptual clarity**:
+
+- If metadata were repeated in every frame, a 30-minute session at 30 FPS would duplicate the same session ID, version strings, and resolution 54,000 times. This is wasteful and introduces the possibility of inconsistency (what if frame 12,000 has a different resolution value than frame 1?).
+- If observations were stored in the metadata file, the metadata file would need to be rewritten every frame — defeating the purpose of having a stable, read-once metadata document.
+
+> ### Engineering Principle #9
+>
+> **See [Engineering Principle #9: Frequency of Change](../engineering-principles.md#9-frequency-of-change)**
+
+### The Schema
+
 The Recorder's data schema defines **exactly** what information is persisted for each frame and each session. Every field must justify its existence.
 
 ### Per-Frame Data
@@ -294,14 +361,11 @@ If the pinch threshold changes from 0.04 to 0.035, the gesture labels change. If
 
 The Recorder cannot anticipate these changes. If it records an interpretation, it records a snapshot of today's algorithm — and tomorrow's algorithm cannot benefit from the recording.
 
-By recording only facts, the Recorder creates data that is **algorithm-agnostic**. Any future algorithm can process the same recording and produce its own interpretations.
+By recording only facts (Principle #6), the Recorder creates data that is **algorithm-agnostic**. Any future algorithm can process the same recording and produce its own interpretations.
 
-> [!IMPORTANT]
 > ### Engineering Principle #7
 >
-> *"A module should own only the information required by its responsibility."*
->
-> The Recorder's responsibility is to preserve observations. It owns observation data: landmarks, timestamps, confidence, handedness, and session metadata. It does not own gesture labels, cursor positions, or any other information that is the responsibility of another module. Owning information outside your responsibility creates coupling — and coupling makes systems fragile.
+> **See [Engineering Principle #7: Strict Ownership](../engineering-principles.md#7-strict-ownership)**
 
 ---
 
@@ -351,6 +415,13 @@ The Recorder must buffer writes and perform them asynchronously. If disk I/O is 
 
 > [!NOTE]
 > This is another application of the producer/consumer pattern from Document 02. MediaPipe is the producer, and the Recorder is a consumer. The consumer must not block the producer. If the Recorder cannot keep up, it degrades gracefully — it may lose some recorded frames, but the live system remains responsive.
+
+### Failure Behaviour
+
+If the Recorder encounters an issue (e.g., disk full, write permission denied, or process crash), it must degrade gracefully:
+- **I/O Errors**: The Recorder logs the error and stops recording. The live pipeline continues unaffected. The partial recording up to the point of failure is preserved (JSON Lines inherently guarantees this).
+- **Crash Recovery**: The `frame_count` in the metadata enables detection of incomplete recordings. If `frame_count` is missing or does not match the file's line count, the recording is flagged as incomplete.
+- **Scope**: The Recorder's failure mode is an architectural property: "degrade gracefully, never corrupt the pipeline."
 
 ---
 
@@ -437,6 +508,8 @@ If a future consumer requires information that is not in the recording (e.g., th
 
 ## 9. Recording Sessions and Metadata
 
+> **See [ADR-0003: Session Structure](../adr/0003-session-structure.md)**
+
 ### What Is a Session?
 
 A **session** is a single continuous recording — from the moment the user starts recording to the moment they stop. A session might last 10 seconds (a quick test) or 30 minutes (a sustained interaction).
@@ -504,6 +577,55 @@ Similarly, the Recorder's own format will evolve. `recorder_version` enables the
 > [!IMPORTANT]
 > Metadata is not optional. A recording without metadata is an anonymous array of numbers with no context. It cannot be reproduced, cannot be attributed to a specific session, and cannot be validated for integrity. Metadata transforms a data file into an engineering artifact.
 
+### Session Coherence
+
+### What Is a Coherent Session?
+
+A recording session should represent **one coherent experiment**. It is the unit of work — the atomic recording that a consumer (replay, benchmark, ML trainer) operates on.
+
+A coherent session has:
+
+- A single, unbroken time range (start to end)
+- Consistent metadata throughout (same camera, same resolution, same FPS target)
+- A single purpose (even if that purpose is just "general testing")
+
+### What Breaks Coherence
+
+| Event | Impact |
+|---|---|
+| Camera disconnects and reconnects | Resolution or device may change — metadata is no longer accurate |
+| User changes recording settings mid-session | Configuration is no longer consistent |
+| Long pause (user walks away for 30 minutes) | Time gap creates misleading velocity/timing data during replay |
+
+### The AirOS V1 Rule
+
+For AirOS V1, the policy is simple: **when conditions change, stop the current session and start a new one**. This keeps each recording internally consistent without adding complexity to the Recorder.
+
+In advanced systems, mid-session changes can be represented as **events** within the recording (e.g., a "ResolutionChanged" event at frame 4,500), allowing the session to continue while preserving an accurate record of what changed and when. This is a future enhancement — it adds complexity that is not justified at the current stage.
+
+> ### Engineering Principle #10
+>
+> **See [Engineering Principle #10: Session Coherence](../engineering-principles.md#10-session-coherence)**
+
+### Metadata Immutability
+
+### The Rule
+
+Metadata should be **immutable** once the session begins. It is established at recording start and never modified during the session.
+
+### Why Immutability Matters
+
+If metadata is mutable, every frame must be interpreted in the context of "what was the metadata at the time this frame was captured?" This transforms a simple lookup (read metadata once, apply to all frames) into a stateful computation (track metadata changes across frames, determine which metadata applies to each frame).
+
+Immutable metadata is simpler to reason about, simpler to implement, and eliminates an entire class of bugs (stale metadata, partial updates, race conditions between metadata writes and frame writes).
+
+### The Exception: End Time and Frame Count
+
+Two metadata fields are written **after** the session ends: `end_time` and `frame_count`. These are not mutations — they are completions. They are set exactly once, when the session is finalized, and never changed again.
+
+> [!TIP]
+> Think of session metadata like the label on a jar: you write it before you seal the jar, and you do not rewrite it afterward. The contents of the jar (observations) may vary from frame to frame, but the label is fixed.
+
 ---
 
 ## 10. File Organization
@@ -547,6 +669,8 @@ Metadata is read once (at the start of replay). Frame data is read sequentially 
 ---
 
 ## 11. Recording Format Design
+
+> **See [ADR-0002: Recording Format](../adr/0002-recording-format.md)**
 
 The choice of recording format is an engineering decision with long-term consequences. A format chosen today must still be readable months or years from now.
 
@@ -596,6 +720,41 @@ A recording format should be readable **years** after it was written. The follow
 
 > [!CAUTION]
 > **Premature optimization of the recording format is a common mistake.** It is tempting to choose a binary format for space efficiency, but the engineering cost of debugging binary files, writing custom parsers, and maintaining backward compatibility far outweighs the disk space savings — especially at AirOS's current scale. Start with human-readable formats. Optimize only when profiling shows that the format is a bottleneck.
+
+### Format Evolution
+
+### The Challenge
+
+The recording format will change. New fields will be added. Existing fields may be restructured. AirOS will evolve, and the format must evolve with it — without destroying the value of existing recordings.
+
+### Extend, Do Not Replace
+
+A recording format should evolve through **extension** rather than **replacement** whenever possible.
+
+| Evolution Strategy | Meaning | Impact on Old Recordings |
+|---|---|---|
+| **Extension** | Add new optional fields; existing fields remain unchanged | Old recordings remain valid; new fields default to absent |
+| **Replacement** | Change the meaning or structure of existing fields | Old recordings become incompatible; migration required |
+
+Extension is preferred because it preserves **backward compatibility** — a newer replay module can still read older recordings, and an older replay module can still read newer recordings (ignoring fields it does not recognize).
+
+### Forward and Backward Compatibility
+
+| Direction | Definition | How AirOS Achieves It |
+|---|---|---|
+| **Backward compatible** | New software reads old recordings | `recorder_version` enables version-aware parsing; old fields are never removed or renamed |
+| **Forward compatible** | Old software reads new recordings | Unknown optional fields are ignored; unknown required fields trigger a graceful error |
+
+### The Required vs. Optional Distinction
+
+When a new field is added to the recording format, the designer must decide: is this field **required** or **optional**?
+
+- **Required fields**: A replay module that does not understand a required field must refuse to replay the recording — attempting to replay without understanding a required field would produce incorrect results.
+- **Optional fields**: A replay module that does not understand an optional field can safely ignore it — the replay will still be correct, just missing some information.
+
+> ### Engineering Principle #12
+>
+> **See [Engineering Principle #12: Evolution by Extension](../engineering-principles.md#12-evolution-by-extension)**
 
 ---
 
@@ -703,201 +862,18 @@ If video recording introduces privacy concerns, should the Recorder anonymize th
 
 ### The Reasoning
 
-```mermaid
-flowchart TD
-    Q["Should the Recorder anonymize video?"] --> R1["What is the Recorder's responsibility?"]
-    R1 --> R2["Preserve factual observations"]
-    R2 --> R3["Is face blurring a factual observation?"]
-    R3 --> R4["No — it is a transformation"]
-    R4 --> R5["Transformations belong to downstream modules"]
-    R5 --> ANSWER["The Recorder does not anonymize"]
+1. **Separation of concerns.** Anonymization is a distinct responsibility that deserves its own module — an **Anonymization Pipeline** that reads raw recordings and produces anonymized versions. This module can be updated, replaced, or configured independently of the Recorder.
 
-    style ANSWER fill:#28a745,stroke:#1e7e34,color:#fff
-```
+2. **The Recorder already has a privacy default.** By defaulting to landmarks-only recording (no video), the Recorder avoids the privacy concern entirely. Video recording is opt-in, and the user consciously accepts the privacy implications when enabling it.
 
-1. **Face blurring modifies data.** A blurred frame is no longer the factual observation — it is a processed version of the observation. If a future module needs the original frame (e.g., to retrain a face detection model or to debug a MediaPipe failure near the face region), the original is lost.
-
-2. **Anonymization logic evolves.** What counts as "sufficient" anonymization changes over time — regulations change, model capabilities improve, new attack vectors emerge. If the Recorder embeds today's anonymization logic, it becomes coupled to privacy policy decisions that are outside its domain.
-
-3. **Separation of concerns.** Anonymization is a distinct responsibility that deserves its own module — an **Anonymization Pipeline** that reads raw recordings and produces anonymized versions. This module can be updated, replaced, or configured independently of the Recorder.
-
-4. **The Recorder already has a privacy default.** By defaulting to landmarks-only recording (no video), the Recorder avoids the privacy concern entirely. Video recording is opt-in, and the user consciously accepts the privacy implications when enabling it.
-
-> [!IMPORTANT]
 > ### Engineering Principle #8
 >
-> *"Privacy-preserving transformations belong to downstream processing modules, not to data capture modules."*
->
-> This principle is a specific instance of the single responsibility principle applied to privacy. The data capture module captures data faithfully. The privacy module transforms data according to policy. Combining them produces a module that is neither a reliable recorder nor a reliable anonymizer.
+> **See [Engineering Principle #8: Downstream Privacy](../engineering-principles.md#8-downstream-privacy)**
 
 ---
 
-## 15. Three Categories of Recorded Information
 
-The Recorder stores three distinct categories of information. Understanding the boundaries between them prevents a common architectural mistake: mixing concerns that change at different frequencies.
-
-### Category 1: Observations
-
-Observations are the **per-frame data** emitted by the Perception stage. They change every frame — every 33 milliseconds at 30 FPS.
-
-| Example | Changes Every |
-|---|---|
-| Landmark coordinates | Frame |
-| Per-landmark confidence | Frame |
-| Handedness | Frame |
-| Hand detection score | Frame |
-| Frame timestamp | Frame |
-| Frame number | Frame |
-
-### Category 2: Metadata
-
-Metadata describes the **recording session itself**. It is established once — at the start of a session — and does not change during the session.
-
-| Example | Changes Every |
-|---|---|
-| Session ID | Never (per session) |
-| Start time | Never (per session) |
-| End time | Set once at session end |
-| Camera resolution | Never (per session) |
-| Recorder format version | Never (per session) |
-| MediaPipe version | Never (per session) |
-| AirOS version | Never (per session) |
-
-### Category 3: Configuration
-
-Configuration describes **how** the recording was performed. Like metadata, it is established at session start.
-
-| Example | Changes Every |
-|---|---|
-| Target FPS | Never (per session) |
-| Selected camera device | Never (per session) |
-| Video recording enabled | Never (per session) |
-| Recording strategy | Never (per session) |
-
-### Why the Categories Matter
-
-```mermaid
-graph TD
-    OBS["Observations<br/>Change every frame<br/>~33ms"] --> FRAME["Stored per frame<br/>in landmarks.jsonl"]
-    META["Metadata<br/>Change once per session"] --> SESS["Stored once<br/>in metadata.json"]
-    CONF["Configuration<br/>Change once per session"] --> SESS
-
-    style OBS fill:#28a745,stroke:#1e7e34,color:#fff
-    style META fill:#4a9eff,stroke:#2d7ad4,color:#fff
-    style CONF fill:#ffc107,stroke:#d4a106,color:#000
-```
-
-The engineering value of this separation is **storage efficiency** and **conceptual clarity**:
-
-- If metadata were repeated in every frame, a 30-minute session at 30 FPS would duplicate the same session ID, version strings, and resolution 54,000 times. This is wasteful and introduces the possibility of inconsistency (what if frame 12,000 has a different resolution value than frame 1?).
-- If observations were stored in the metadata file, the metadata file would need to be rewritten every frame — defeating the purpose of having a stable, read-once metadata document.
-
-> [!IMPORTANT]
-> ### Engineering Principle #9
->
-> *"Store information at the lowest frequency at which it changes."*
->
-> Observations change every frame — store them per frame. Metadata changes once per session — store it once per session. Mixing these frequencies wastes space, risks inconsistency, and makes both categories harder to reason about.
-
----
-
-## 16. Recording Session Coherence
-
-### What Is a Coherent Session?
-
-A recording session should represent **one coherent experiment**. It is the unit of work — the atomic recording that a consumer (replay, benchmark, ML trainer) operates on.
-
-A coherent session has:
-
-- A single, unbroken time range (start to end)
-- Consistent metadata throughout (same camera, same resolution, same FPS target)
-- A single purpose (even if that purpose is just "general testing")
-
-### What Breaks Coherence
-
-| Event | Impact |
-|---|---|
-| Camera disconnects and reconnects | Resolution or device may change — metadata is no longer accurate |
-| User changes recording settings mid-session | Configuration is no longer consistent |
-| Long pause (user walks away for 30 minutes) | Time gap creates misleading velocity/timing data during replay |
-
-### The AirOS V1 Rule
-
-For AirOS V1, the policy is simple: **when conditions change, stop the current session and start a new one**. This keeps each recording internally consistent without adding complexity to the Recorder.
-
-In advanced systems, mid-session changes can be represented as **events** within the recording (e.g., a "ResolutionChanged" event at frame 4,500), allowing the session to continue while preserving an accurate record of what changed and when. This is a future enhancement — it adds complexity that is not justified at the current stage.
-
-> [!IMPORTANT]
-> ### Engineering Principle #10
->
-> *"A recording session should represent one coherent experiment."*
->
-> A coherent session has consistent metadata, an unbroken time range, and a single set of recording conditions. When conditions change, start a new session. Coherence is what makes a recording reliable for replay, benchmarking, and comparison.
-
----
-
-## 17. Metadata Immutability
-
-### The Rule
-
-Metadata should be **immutable** once the session begins. It is established at recording start and never modified during the session.
-
-### Why Immutability Matters
-
-If metadata is mutable, every frame must be interpreted in the context of "what was the metadata at the time this frame was captured?" This transforms a simple lookup (read metadata once, apply to all frames) into a stateful computation (track metadata changes across frames, determine which metadata applies to each frame).
-
-Immutable metadata is simpler to reason about, simpler to implement, and eliminates an entire class of bugs (stale metadata, partial updates, race conditions between metadata writes and frame writes).
-
-### The Exception: End Time and Frame Count
-
-Two metadata fields are written **after** the session ends: `end_time` and `frame_count`. These are not mutations — they are completions. They are set exactly once, when the session is finalized, and never changed again.
-
-> [!TIP]
-> Think of session metadata like the label on a jar: you write it before you seal the jar, and you do not rewrite it afterward. The contents of the jar (observations) may vary from frame to frame, but the label is fixed.
-
----
-
-## 18. Recording Format Evolution
-
-### The Challenge
-
-The recording format will change. New fields will be added. Existing fields may be restructured. AirOS will evolve, and the format must evolve with it — without destroying the value of existing recordings.
-
-### Extend, Do Not Replace
-
-A recording format should evolve through **extension** rather than **replacement** whenever possible.
-
-| Evolution Strategy | Meaning | Impact on Old Recordings |
-|---|---|---|
-| **Extension** | Add new optional fields; existing fields remain unchanged | Old recordings remain valid; new fields default to absent |
-| **Replacement** | Change the meaning or structure of existing fields | Old recordings become incompatible; migration required |
-
-Extension is preferred because it preserves **backward compatibility** — a newer replay module can still read older recordings, and an older replay module can still read newer recordings (ignoring fields it does not recognize).
-
-### Forward and Backward Compatibility
-
-| Direction | Definition | How AirOS Achieves It |
-|---|---|---|
-| **Backward compatible** | New software reads old recordings | `recorder_version` enables version-aware parsing; old fields are never removed or renamed |
-| **Forward compatible** | Old software reads new recordings | Unknown optional fields are ignored; unknown required fields trigger a graceful error |
-
-### The Required vs. Optional Distinction
-
-When a new field is added to the recording format, the designer must decide: is this field **required** or **optional**?
-
-- **Required fields**: A replay module that does not understand a required field must refuse to replay the recording — attempting to replay without understanding a required field would produce incorrect results.
-- **Optional fields**: A replay module that does not understand an optional field can safely ignore it — the replay will still be correct, just missing some information.
-
-> [!IMPORTANT]
-> ### Engineering Principle #13
->
-> *"A recording format should evolve through extension rather than replacement whenever possible."*
->
-> Extension preserves backward compatibility and protects the value of existing recordings. Replacement destroys that value and forces migration. Choose extension first; resort to replacement only when the old structure is fundamentally incompatible with the new requirement.
-
----
-
-## 19. Recordings as Long-Term Engineering Assets
+## 15. Recordings as Long-Term Engineering Assets
 
 ### The Mindset Shift
 
@@ -921,23 +897,15 @@ A recording that requires reading the source code to understand is not a long-te
 
 This is why field names like `index_finger_tip_x` are preferable to `f8_x`, and why the metadata includes human-readable timestamps rather than opaque integer counters.
 
-> [!IMPORTANT]
 > ### Engineering Principle #11
 >
-> *"Recordings are long-term engineering assets, not temporary debug files."*
->
-> Design recording formats, directory structures, and metadata schemas as if the recordings will be read by someone who has never seen the current codebase — because in six months, that person is you.
-
-> [!IMPORTANT]
-> ### Engineering Principle #12
->
-> *"A recording should be understandable without reading the implementation."*
->
-> Self-describing field names, human-readable timestamps, version stamps, and structured metadata all serve this goal. The recording is a standalone artifact — it should not depend on oral history or tribal knowledge to be interpreted.
+> **See [Engineering Principle #11: Recordings as Long-Term Assets](../engineering-principles.md#11-recordings-as-long-term-assets)**
 
 ---
 
-## 20. Replay Architecture
+## 16. Replay Architecture
+
+> **See [ADR-0004: Landmark Stream Interface](../adr/0004-landmark-stream.md)**
 
 ### Replay's Role in the Pipeline
 
@@ -961,12 +929,9 @@ graph LR
     style REPLAY fill:#4a9eff,stroke:#2d7ad4,color:#fff
 ```
 
-> [!IMPORTANT]
-> ### Engineering Principle #16
+> ### Engineering Principle #14
 >
-> *"Replay should be indistinguishable from live perception to downstream modules."*
->
-> If a downstream module needs to check whether data is live or replayed, the interface design is wrong. The Landmark Stream contract guarantees that the data format is identical regardless of source. This is what makes replay useful for benchmarking and regression testing — the module under test operates in exactly the same conditions as live operation.
+> **See [Engineering Principle #14: Interface Equivalence](../engineering-principles.md#14-interface-equivalence)**
 
 ### Replay Modes
 
@@ -979,12 +944,9 @@ Replay supports multiple playback speeds, but the Replay module itself **does no
 | **Slow** | Emit frames slower than real time | Debugging timing-sensitive issues; frame-by-frame inspection |
 | **Unbounded** | Emit frames as fast as the consumer can process them | Maximum-speed benchmarking; no timing simulation |
 
-> [!IMPORTANT]
-> ### Engineering Principle #17
+> ### Engineering Principle #15
 >
-> *"Infrastructure modules execute policies; they should not define them."*
->
-> The Replay module does not decide replay speed, frame filtering, or which sessions to replay. Those are **policies** defined by the caller — a benchmark harness, a debugging tool, or a user interface. Replay executes whatever policy it receives. This separation keeps Replay simple, reusable, and free from decision-making logic that would couple it to specific use cases.
+> **See [Engineering Principle #15: Policy Injection](../engineering-principles.md#15-policy-injection)**
 
 ### Timestamp Preservation
 
@@ -999,172 +961,19 @@ This is a critical distinction:
 
 The replay speed affects **when** each frame is emitted (the wall clock delay between frames), but not **what** each frame contains. The timestamps inside the frame data are historical facts — they belong to the original recording and must not be modified.
 
-> [!IMPORTANT]
-> ### Engineering Principle #14
+> ### Engineering Principle #13
 >
-> *"The same recording should always reproduce the same observations."*
->
-> A recording is a historical record. Replaying it must produce identical observations every time, regardless of when the replay occurs, what machine it runs on, or what speed it runs at. If replay modifies timestamps, reorders frames, or injects new data, it is no longer replay — it is synthesis.
-
-> [!IMPORTANT]
-> ### Engineering Principle #15
->
-> *"Replay should preserve history, not merely reproduce data."*
->
-> The distinction is subtle but important. "Reproducing data" means emitting the same bytes. "Preserving history" means maintaining the temporal relationships, the gaps, the timing artifacts, and the original context. A recording with a 500ms timing gap between frames 47 and 48 is not an error — it is a fact about what happened during the original session, and replay must preserve it.
-
-> [!IMPORTANT]
-> ### Engineering Principle #18
->
-> *"Replay speed changes the rate of playback, not the recorded history."*
->
-> Playing a recording at 2× speed halves the wall-clock delay between emitted frames. It does not modify the timestamps stored within those frames. The consumer receives frames faster, but the data inside each frame is identical to the original. This is the same principle as playing a video at 2× speed — the audio pitch may change, but the content does not.
+> **See [Engineering Principle #13: Replay Determinism and Context](../engineering-principles.md#13-replay-determinism-and-context)**
 
 ---
 
-## 21. Engineering Principles Introduced
+## 17. Engineering Principles
 
-This document introduces thirteen new engineering principles. Together with Principles #1–5 from Documents 01 and 02, they form the growing AirOS Engineering Principles series.
-
-### Principle #6
-
-> *"Infrastructure modules preserve facts; they do not make decisions."*
-
-The Recorder is infrastructure. Its job is to faithfully preserve what was observed, not to judge, filter, or interpret those observations. Every decision the Recorder makes is a degree of freedom removed from future modules.
-
-**Cross-domain examples:**
-
-| Domain | Infrastructure Module | Fact It Preserves | Decision It Avoids |
-|---|---|---|---|
-| **Databases** | Transaction log (WAL) | Every write operation in order | Whether the write was "important" |
-| **Networking** | Packet capture (tcpdump) | Every packet on the wire | Whether the packet is malicious |
-| **Aviation** | Flight data recorder (black box) | Sensor readings every second | Whether the readings indicate a problem |
-| **AirOS** | Recorder | Every landmark frame | Whether the frame contains a gesture |
+For a full list of all engineering principles introduced in this document, see the **[AirOS Engineering Principles](../engineering-principles.md)** repository.
 
 ---
 
-### Principle #7
-
-> *"A module should own only the information required by its responsibility."*
-
-Ownership of information creates coupling. If the Recorder owns gesture labels, it must be updated whenever the gesture vocabulary changes. If it owns cursor positions, it must be updated whenever the screen mapping changes. By owning only observation data, the Recorder is immune to changes in downstream modules.
-
----
-
-### Principle #8
-
-> *"Privacy-preserving transformations belong to downstream processing modules, not to data capture modules."*
-
-Data capture and data transformation are different responsibilities. Combining them produces a module that does both poorly — it cannot be trusted as a faithful recorder (because it modifies data) and cannot be trusted as a privacy tool (because privacy is not its primary concern).
-
----
-
-### Principle #9
-
-> *"Store information at the lowest frequency at which it changes."*
-
-Observations change every frame — store them per frame. Metadata changes once per session — store it once. Mixing frequencies wastes space, risks inconsistency, and makes the data harder to reason about.
-
----
-
-### Principle #10
-
-> *"A recording session should represent one coherent experiment."*
-
-A coherent session has consistent metadata, an unbroken time range, and a single set of recording conditions. When conditions change, start a new session.
-
----
-
-### Principle #11
-
-> *"Recordings are long-term engineering assets, not temporary debug files."*
-
-Design recording formats, directory structures, and metadata schemas for durability. A recording made today should be useful six months from now — for regression testing, ML training, or benchmarking.
-
----
-
-### Principle #12
-
-> *"A recording should be understandable without reading the implementation."*
-
-Self-describing field names, human-readable timestamps, version stamps, and structured metadata make recordings standalone artifacts.
-
----
-
-### Principle #13
-
-> *"A recording format should evolve through extension rather than replacement whenever possible."*
-
-Extension preserves backward compatibility and protects the value of existing recordings. Replacement destroys that value and forces migration.
-
----
-
-### Principle #14
-
-> *"The same recording should always reproduce the same observations."*
-
-A recording is a historical record. Replaying it must produce identical observations every time, regardless of when, where, or at what speed the replay occurs.
-
----
-
-### Principle #15
-
-> *"Replay should preserve history, not merely reproduce data."*
-
-Maintaining temporal relationships, timing gaps, and original context is as important as reproducing the correct landmark values.
-
----
-
-### Principle #16
-
-> *"Replay should be indistinguishable from live perception to downstream modules."*
-
-The Landmark Stream contract guarantees that the data format is identical regardless of source. A module that needs to check whether data is live or replayed indicates a broken interface design.
-
----
-
-### Principle #17
-
-> *"Infrastructure modules execute policies; they should not define them."*
-
-Replay does not decide replay speed. The Recorder does not decide what to filter. Infrastructure modules receive policies from their callers and execute them faithfully.
-
----
-
-### Principle #18
-
-> *"Replay speed changes the rate of playback, not the recorded history."*
-
-Playing a recording at 2× speed halves the wall-clock delay between emitted frames. It does not modify the timestamps stored within those frames.
-
----
-
-### Full Principles Index
-
-| # | Principle | Source |
-|---|---|---|
-| 1 | Collect the minimum useful information required to solve the problem reliably | Document 01 |
-| 2 | Store facts, not interpretations | Document 02 |
-| 3 | Separate data collection from data processing | Document 02 |
-| 4 | In real-time systems, freshness is often more valuable than completeness | Document 02 |
-| 5 | Every module should have exactly one responsibility | Document 02 |
-| 6 | Infrastructure modules preserve facts; they do not make decisions | Document 03 |
-| 7 | A module should own only the information required by its responsibility | Document 03 |
-| 8 | Privacy-preserving transformations belong to downstream processing modules, not to data capture modules | Document 03 |
-| 9 | Store information at the lowest frequency at which it changes | Document 03 |
-| 10 | A recording session should represent one coherent experiment | Document 03 |
-| 11 | Recordings are long-term engineering assets, not temporary debug files | Document 03 |
-| 12 | A recording should be understandable without reading the implementation | Document 03 |
-| 13 | A recording format should evolve through extension rather than replacement whenever possible | Document 03 |
-| 14 | The same recording should always reproduce the same observations | Document 03 |
-| 15 | Replay should preserve history, not merely reproduce data | Document 03 |
-| 16 | Replay should be indistinguishable from live perception to downstream modules | Document 03 |
-| 17 | Infrastructure modules execute policies; they should not define them | Document 03 |
-| 18 | Replay speed changes the rate of playback, not the recorded history | Document 03 |
-
----
-
-## 22. Common Mistakes
+## 18. Common Mistakes
 
 ### Mistake 1: The Recorder That Thinks
 
@@ -1182,7 +991,7 @@ Playing a recording at 2× speed halves the wall-clock delay between emitted fra
 
 **Cause**: The developer considered metadata "boilerplate" and skipped it.
 
-**Why it is wrong**: Without metadata, recordings are anonymous data files. They cannot be correlated with specific sessions, cannot be validated for integrity, and cannot be replayed at the correct speed. Metadata is not overhead — it is what makes a recording useful. *(Violates Principle #12)*
+**Why it is wrong**: Without metadata, recordings are anonymous data files. They cannot be correlated with specific sessions, cannot be validated for integrity, and cannot be replayed at the correct speed. Metadata is not overhead — it is what makes a recording useful. *(Violates Principle #11)*
 
 ---
 
@@ -1192,7 +1001,7 @@ Playing a recording at 2× speed halves the wall-clock delay between emitted fra
 
 **Cause**: No version stamp was included in recordings. The replay module assumed all files use the current format.
 
-**Why it is wrong**: The recording format will evolve. Without a version stamp, there is no way to distinguish old-format files from new-format files. With a version stamp, the replay module can implement backward-compatible parsing. *(Violates Principle #13)*
+**Why it is wrong**: The recording format will evolve. Without a version stamp, there is no way to distinguish old-format files from new-format files. With a version stamp, the replay module can implement backward-compatible parsing. *(Violates Principle #12)*
 
 ---
 
@@ -1242,7 +1051,7 @@ Playing a recording at 2× speed halves the wall-clock delay between emitted fra
 
 **Cause**: The Replay module replaced the original timestamps with current wall-clock times.
 
-**Why it is wrong**: Timing-dependent computations (velocity, acceleration, gesture hold duration) produce different results when timestamps change. Replay must emit the original timestamps to preserve the temporal relationships from the original session. *(Violates Principles #14 and #15)*
+**Why it is wrong**: Timing-dependent computations (velocity, acceleration, gesture hold duration) produce different results when timestamps change. Replay must emit the original timestamps to preserve the temporal relationships from the original session. *(Violates Principle #13)*
 
 ---
 
@@ -1252,7 +1061,7 @@ Playing a recording at 2× speed halves the wall-clock delay between emitted fra
 
 **Cause**: The replay speed policy was embedded inside the Replay module.
 
-**Why it is wrong**: Different consumers need different replay speeds — real-time for user-facing demos, unbounded for benchmarks, slow for debugging. If the speed is hardcoded, the Replay module must be modified for each use case. The speed should be a policy passed in by the caller. *(Violates Principle #17)*
+**Why it is wrong**: Different consumers need different replay speeds — real-time for user-facing demos, unbounded for benchmarks, slow for debugging. If the speed is hardcoded, the Replay module must be modified for each use case. The speed should be a policy passed in by the caller. *(Violates Principle #15)*
 
 ---
 
@@ -1266,7 +1075,7 @@ Playing a recording at 2× speed halves the wall-clock delay between emitted fra
 
 ---
 
-## 23. Key Takeaways
+## 19. Key Takeaways
 
 | # | Concept | One-Line Summary |
 |---|---|---|
@@ -1294,7 +1103,7 @@ Playing a recording at 2× speed halves the wall-clock delay between emitted fra
 
 ---
 
-## 24. Questions for Revision
+## 20. Questions for Revision
 
 Use these questions to test engineering reasoning, not memorization. If any answer is unclear, re-read the relevant section.
 
@@ -1352,7 +1161,7 @@ Use these questions to test engineering reasoning, not memorization. If any answ
 
 ---
 
-## 25. Related Documents
+## 21. Related Documents
 
 ### Architecture
 
@@ -1397,15 +1206,12 @@ Use these questions to test engineering reasoning, not memorization. If any answ
 | 8 | Privacy-preserving transformations belong to downstream processing modules, not to data capture modules | Document 03 |
 | 9 | Store information at the lowest frequency at which it changes | Document 03 |
 | 10 | A recording session should represent one coherent experiment | Document 03 |
-| 11 | Recordings are long-term engineering assets, not temporary debug files | Document 03 |
-| 12 | A recording should be understandable without reading the implementation | Document 03 |
-| 13 | A recording format should evolve through extension rather than replacement whenever possible | Document 03 |
-| 14 | The same recording should always reproduce the same observations | Document 03 |
-| 15 | Replay should preserve history, not merely reproduce data | Document 03 |
-| 16 | Replay should be indistinguishable from live perception to downstream modules | Document 03 |
-| 17 | Infrastructure modules execute policies; they should not define them | Document 03 |
-| 18 | Replay speed changes the rate of playback, not the recorded history | Document 03 |
+| 11 | Recordings are long-term engineering assets — self-describing, durable, and understandable without reading the current implementation | Document 03 |
+| 12 | A recording format should evolve through extension rather than replacement whenever possible | Document 03 |
+| 13 | The same recording should always reproduce the same observations — including their temporal relationships and original context | Document 03 |
+| 14 | Replay should be indistinguishable from live perception to downstream modules | Document 03 |
+| 15 | Infrastructure modules execute policies; they should not define them | Document 03 |
 
 ---
 
-*AirOS Engineering Handbook · Recorder and Replay Architecture · v2.0*
+*AirOS Engineering Handbook · Recorder and Replay Architecture · v3.0*
