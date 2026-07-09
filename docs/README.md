@@ -8,14 +8,18 @@ All project documentation beyond the root README lives here. Centralising docume
 
 ```
 docs/
-├── adr/                # Architecture Decision Records
-│   ├── template.md     # ADR template
-│   └── 0001-*.md       # Individual decisions
-├── engineering/        # Engineering Handbook — technical concept references
+├── adr/                      # Architecture Decision Records
+│   ├── template.md           # ADR template
+│   ├── 0001-record-architecture-decisions.md
+│   ├── 0002-recording-format.md
+│   ├── 0003-session-structure.md
+│   └── 0004-landmark-stream.md
+├── engineering/              # Engineering Handbook — technical concept references
 │   ├── 01-hand-landmarks-and-coordinate-system.md
 │   ├── 02-data-pipeline.md
 │   └── 03-recorder-and-replay.md
-├── architecture.md     # System architecture overview
+├── architecture.md           # System architecture overview
+├── engineering-principles.md # Central repository of engineering principles
 └── README.md
 ```
 
@@ -60,8 +64,15 @@ See [`docs/engineering/`](engineering/) for the full handbook.
 
 ADRs capture the *why* behind significant technical decisions. See [adr/template.md](adr/template.md) for the format.
 
+| ADR | Title |
+|---|---|
+| 0001 | [Record Architecture Decisions](adr/0001-record-architecture-decisions.md) |
+| 0002 | [Recording Format](adr/0002-recording-format.md) |
+| 0003 | [Session Structure](adr/0003-session-structure.md) |
+| 0004 | [Landmark Stream Interface](adr/0004-landmark-stream.md) |
+
 To create a new ADR:
 1. Copy `adr/template.md`
-2. Number it sequentially (e.g., `0002-choose-mediapipe.md`)
+2. Number it sequentially (e.g., `0005-choose-mediapipe.md`)
 3. Fill in all sections
 4. Set status to `Proposed`, then update to `Accepted`/`Rejected` after review
