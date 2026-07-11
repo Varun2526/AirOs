@@ -146,3 +146,152 @@ Based on the real-time constraints, we have reached the following architectural 
 These concepts directly motivate the implementation of the first production module: **Camera Capture**. 
 
 The Camera Capture module will be responsible for acquiring frames from the hardware at a fixed rate and distributing them to the downstream consumers (Perception and Recorder) while respecting their distinct queueing and latency policies. This module is the foundation of the real-time pipeline.
+
+---
+
+## Camera Capture Module — Design Review
+
+This section documents the engineering decisions made before implementation.
+
+### 1. Purpose of the Camera Capture Module
+
+The Camera Capture module has one responsibility:
+- Acquire raw frames from the webcam.
+- Timestamp each frame.
+- Assign sequential frame numbers.
+- Publish frames into the live pipeline.
+
+It is a producer. It does not interpret data.
+
+### 2. Responsibilities
+
+The Camera Capture module is responsible for:
+- Opening the camera.
+- Reading frames continuously.
+- Creating Frame objects.
+- Timestamping observations.
+- Assigning frame numbers.
+- Publishing frames to the downstream pipeline.
+- Handling camera lifecycle.
+
+### 3. Explicit Non-Responsibilities
+
+Camera Capture must **NOT**:
+- Detect landmarks.
+- Run MediaPipe.
+- Recognize gestures.
+- Predict confidence.
+- Smooth data.
+- Record sessions.
+- Save files.
+- Compress images.
+- Attach session information.
+- Understand replay.
+
+These responsibilities belong to other modules.
+
+### 4. Frame Design Decisions
+
+During the design review, we established that a `Frame` object should only contain information that belongs to a single observation.
+
+**Current agreed fields:**
+- Raw image
+- Timestamp
+- Frame number
+
+```mermaid
+classDiagram
+    class Frame {
+        +ndarray raw_image
+        +float timestamp
+        +int frame_number
+    }
+    
+    class RejectedFields {
+        <<Do Not Include>>
+        -String session_id
+        -Tuple resolution
+        -float fps
+    }
+```
+
+**Rejected fields and reasoning:**
+- **Session ID:** Belongs to Recorder because recording sessions are Recorder concepts.
+- **Resolution:** Belongs to camera configuration because it usually remains constant throughout a session.
+- **Aspect Ratio:** Belongs to camera configuration rather than individual observations.
+- **FPS:** Property of the camera stream rather than an individual frame.
+- **Compression information:** Camera Capture does not perform compression.
+
+This reinforces the engineering principle: *Store only information owned by the object.*
+
+### 5. Queue Policy Discussion
+
+Live processing values freshness over completeness. Therefore, when the live queue becomes full, the system will **drop the oldest frame**.
+
+**Example:**
+- Queue: `101, 102, 103, 104, 105`
+- New frame: `106`
+- Result: `102, 103, 104, 105, 106`
+
+```mermaid
+flowchart LR
+    subgraph Live Queue [Bounded Queue: Size 5]
+        direction LR
+        F102[102] --> F103[103] --> F104[104] --> F105[105] --> F106[106<br>New]
+    end
+    
+    F101[101<br>Dropped] -.-> F102
+    
+    style F101 stroke:#ff0000,stroke-width:2px,stroke-dasharray: 5 5
+    style F106 stroke:#00ff00,stroke-width:2px
+```
+
+This keeps processing closer to the user's current hand position. This policy applies only to the live processing pipeline.
+
+### 6. Recorder Conflict
+
+Recorder and Live Processing have different goals.
+- **Recorder requires:** Complete history, zero observation loss.
+- **Live Processing requires:** Low latency, fresh observations.
+
+Therefore, the recorder must not depend on a queue that drops frames. This reinforces the project's principle: *Infrastructure preserves facts.*
+
+### 7. Camera Module Philosophy
+
+The Camera Capture module should know as little as possible. It should not know:
+- Who consumes the frames.
+- Whether recording is enabled.
+- Whether replay exists.
+- Whether gesture recognition is active.
+
+```mermaid
+flowchart TD
+    subgraph Unknown to Camera Module
+        Perc[Perception]
+        Rec[Recorder]
+        Gest[Gesture Engine]
+    end
+    
+    Cam[Camera Capture<br>Producer] -->|Blindly Publishes<br>Frames| Bus((Data Bus / Queues))
+    Bus --> Perc
+    Bus --> Rec
+```
+
+Its only responsibility is producing timestamped observations.
+
+### 8. Engineering Lessons Learned
+
+- Responsibilities are more important than convenience.
+- Every piece of data should have a clear owner.
+- Separate observations from configuration.
+- Separate observations from recording metadata.
+- Real-time systems optimize for freshness.
+- Different consumers may require different policies.
+- Queue policy belongs to system design rather than the queue itself.
+- Good software engineering removes responsibilities instead of continuously adding them.
+
+### 9. Next Step
+
+The design review is complete. The next milestone is implementing the first production module: **Camera Capture**. 
+
+Future discussions should focus on validating today's design decisions through production-quality code rather than further architectural expansion.
