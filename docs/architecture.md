@@ -91,9 +91,9 @@ graph TD
 | **Infrastructure layer** | The Recorder, Recordings, and Replay system exist to support offline analysis. They do not affect the live processing path. |
 | **Processing layer** | The Gesture Engine, Action Mapping, and OS Control form the real-time processing path that translates landmarks into desktop actions. |
 | **Bounded queue** | Sits only on the processing path, between the Landmark Stream and the Gesture Engine, as well as before Perception. Decouples stream production speed from processing consumption speed. Prevents memory growth; prioritises fresh data over complete data. |
-| **Recorder passivity** | The Recorder writes the original observations to disk. It does not filter, smooth, or interpret data. See [Document 03](engineering/03-recorder-and-replay.md). |
+| **Recorder passivity** | The Recorder writes the original observations to disk. It does not filter, smooth, or interpret data. See [Document 03](handbook/03-recorder-and-replay.md). |
 
-> For the producer–consumer model, bounded queues, latency budgets, and freshness-over-completeness trade-off, see [Engineering Document 04: Real-Time Systems](engineering/04-real-time-systems.md). For the Recorder's responsibilities and data schema, see [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
+> For the producer–consumer model, bounded queues, latency budgets, and freshness-over-completeness trade-off, see [Engineering Document 04: Real-Time Systems](handbook/04-real-time-systems.md). For the Recorder's responsibilities and data schema, see [Engineering Document 03: Recorder and Replay Architecture](handbook/03-recorder-and-replay.md).
 
 ## Design Principles
 
@@ -117,7 +117,7 @@ The Landmark Stream is the stable contract between Perception and downstream con
 
 ### Recorder
 
-The Recorder is a passive infrastructure module responsible for preserving the original observations emitted by Camera Capture, without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md). Note that while Document 03 initially placed the Recorder after Perception, Document 04 formally moved it to fork directly from Camera Capture to resolve queue policy conflicts.
+The Recorder is a passive infrastructure module responsible for preserving the original observations emitted by Camera Capture, without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](handbook/03-recorder-and-replay.md). Note that while Document 03 initially placed the Recorder after Perception, Document 04 formally moved it to fork directly from Camera Capture to resolve queue policy conflicts.
 
 ### Replay
 
@@ -149,4 +149,4 @@ See [Architecture Decision Records](adr/) for the reasoning behind significant t
 
 ## Engineering Handbook
 
-For foundational concepts — landmarks, coordinate systems, data pipelines, producer/consumer patterns, and engineering principles — see the [Engineering Handbook](engineering/).
+For foundational concepts — landmarks, coordinate systems, data pipelines, producer/consumer patterns, and engineering principles — see the [Engineering Handbook](handbook/).

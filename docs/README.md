@@ -14,7 +14,7 @@ docs/
 │   ├── 0002-recording-format.md
 │   ├── 0003-session-structure.md
 │   └── 0004-landmark-stream.md
-├── engineering/              # Engineering Handbook — technical concept references
+├── handbook/              # Engineering Handbook — technical concept references
 │   ├── 01-hand-landmarks-and-coordinate-system.md
 │   ├── 02-data-pipeline.md
 │   └── 03-recorder-and-replay.md
@@ -30,7 +30,7 @@ docs/
 - API documentation
 - Design documents
 - Architecture Decision Records (ADRs) in `docs/adr/`
-- Engineering concept references in `docs/engineering/`
+- Engineering concept references in `docs/handbook/`
 - User guides and tutorials
 
 ## What Does NOT Belong Here
@@ -46,9 +46,9 @@ AirOS is documented as an engineering handbook that grows alongside the implemen
 
 | # | Document | Status |
 |---|---|---|
-| 01 | [Hand Landmarks and Coordinate System](engineering/01-hand-landmarks-and-coordinate-system.md) | ✅ Complete |
-| 02 | [Data Pipeline — Recording, Replay, and Engineering Thinking](engineering/02-data-pipeline.md) | ✅ Complete |
-| 03 | [Recorder and Replay Architecture](engineering/03-recorder-and-replay.md) | ✅ Complete |
+| 01 | [Hand Landmarks and Coordinate System](handbook/01-hand-landmarks-and-coordinate-system.md) | ✅ Complete |
+| 02 | [Data Pipeline — Recording, Replay, and Engineering Thinking](handbook/02-data-pipeline.md) | ✅ Complete |
+| 03 | [Recorder and Replay Architecture](handbook/03-recorder-and-replay.md) | ✅ Complete |
 | 04 | Real-Time Systems | ⬜ Planned |
 | 05 | Filtering and Smoothing | ⬜ Planned |
 | 06 | Feature Extraction | ⬜ Planned |
@@ -58,7 +58,7 @@ AirOS is documented as an engineering handbook that grows alongside the implemen
 | 10 | Performance Optimization | ⬜ Planned |
 | 11 | Production Readiness | ⬜ Planned |
 
-See [`docs/engineering/`](engineering/) for the full handbook.
+See [`docs/handbook/`](handbook/) for the full handbook.
 
 ## Architecture Decision Records (ADRs)
 
