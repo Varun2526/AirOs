@@ -12,18 +12,19 @@ AirOS is an AI-powered hand gesture interaction system that processes webcam inp
 
 The following diagram shows the **product-level** pipeline — the simplest way to understand what AirOS does:
 
-```
-┌──────────┐    ┌───────────────┐    ┌────────────────────┐    ┌────────────────┐    ┌────────────┐
-│  Camera   │───▶│  Perception    │───▶│ Gesture Recognition │───▶│ Action Mapping │───▶│ OS Control │
-│  Input    │    │  (CV/ML)       │    │  (Classification)   │    │  (Config)      │    │ (Platform) │
-└──────────┘    └───────────────┘    └────────────────────┘    └────────────────┘    └────────────┘
+```mermaid
+flowchart LR
+    Cam["Camera<br/>Capture"] --> Perc["Perception<br/>(CV/ML)"]
+    Perc --> Gest["Gesture Recognition<br/>(Classification)"]
+    Gest --> Act["Action Mapping<br/>(Config)"]
+    Act --> OS["OS Control<br/>(Platform)"]
 ```
 
 ### Stage Descriptions
 
 | Stage | Responsibility | Key Concerns |
 |---|---|---|
-| **Camera Input** | Capture frames from webcam | Frame rate, resolution, device selection |
+| **Camera Capture** | Capture raw frames from webcam | Frame rate, resolution, timestamping |
 | **Perception** | Detect hands, extract landmarks, estimate 3D coordinates, compute confidence, identify handedness | Model accuracy, latency, GPU/CPU |
 | **Gesture Recognition** | Classify hand poses into named gestures | Gesture vocabulary, confidence thresholds |
 | **Action Mapping** | Map gestures to system actions | Configuration, customisability |
@@ -40,9 +41,11 @@ Recorder and Replay form AirOS's **engineering infrastructure**. They are not re
 
 ```mermaid
 graph TD
-    CAM["📷 Camera Input"] --> PERC["🧠 Perception<br/>(MediaPipe)"]
+    CAM["📷 Camera Capture"] --> FT["Frame Transport"]
 
-    PERC --> REC["💾 Recorder"]
+    FT --> PERC["🧠 Perception<br/>(MediaPipe)"]
+    FT --> REC["💾 Recorder"]
+    
     PERC --> LS["Landmark Stream<br/>(interface)"]
 
     REC --> DISK["📁 Recordings"]
@@ -67,6 +70,7 @@ graph TD
     end
 
     style CAM fill:#6c757d,stroke:#545b62,color:#fff
+    style FT fill:#e9ecef,stroke:#6c757d,color:#000
     style PERC fill:#4a9eff,stroke:#2d7ad4,color:#fff
     style LS fill:#e9ecef,stroke:#6c757d,color:#000
     style REC fill:#17a2b8,stroke:#117a8b,color:#fff
@@ -83,13 +87,13 @@ graph TD
 | Property | Description |
 |---|---|
 | **Landmark Stream** | The common interface that both Perception (live) and Replay (offline) produce into. Any module that consumes landmarks reads from this stream — it does not know or care whether the data is live or replayed. If a future module needs landmark data, it subscribes to the stream without modifying Replay or Perception. |
-| **Recorder fork** | The Recorder forks **directly from Perception**, not from the processing queue. This ensures the Recorder never misses frames due to processing lag. The Recorder captures observations immediately; the processing path may buffer or delay work. |
+| **Recorder fork** | The Recorder forks **directly from Camera Capture via Frame Transport**, not from Perception. This resolves the architectural conflict between Live Processing (which drops frames via a bounded queue for freshness) and the Recorder (which uses an unbounded queue to preserve absolute completeness). |
 | **Infrastructure layer** | The Recorder, Recordings, and Replay system exist to support offline analysis. They do not affect the live processing path. |
 | **Processing layer** | The Gesture Engine, Action Mapping, and OS Control form the real-time processing path that translates landmarks into desktop actions. |
-| **Bounded queue** | Sits only on the processing path, between the Landmark Stream and the Gesture Engine. Decouples stream production speed from processing consumption speed. Prevents memory growth; prioritises fresh data over complete data. |
-| **Recorder passivity** | The Recorder writes the original observations emitted by Perception to disk. It does not filter, smooth, or interpret data. See [Document 03](engineering/03-recorder-and-replay.md). |
+| **Bounded queue** | Sits only on the processing path, between the Landmark Stream and the Gesture Engine, as well as before Perception. Decouples stream production speed from processing consumption speed. Prevents memory growth; prioritises fresh data over complete data. |
+| **Recorder passivity** | The Recorder writes the original observations to disk. It does not filter, smooth, or interpret data. See [Document 03](engineering/03-recorder-and-replay.md). |
 
-> For the producer–consumer model, bounded queues, and freshness-over-completeness trade-off, see [Engineering Document 02: Data Pipeline](engineering/02-data-pipeline.md). For the Recorder's responsibilities and data schema, see [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
+> For the producer–consumer model, bounded queues, latency budgets, and freshness-over-completeness trade-off, see [Engineering Document 04: Real-Time Systems](engineering/04-real-time-systems.md). For the Recorder's responsibilities and data schema, see [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
 
 ## Design Principles
 
@@ -101,6 +105,10 @@ graph TD
 
 ## Module Boundaries
 
+### Camera Capture
+
+The Camera Capture module is the primary producer of facts. Its sole responsibility is to acquire raw frames from the webcam, attach a timestamp and sequential frame number, and publish them via Frame Transport. It operates independently of any consumers and makes no decisions about data interpretation.
+
 ### Perception
 
 The Perception stage wraps the hand detection and landmark extraction model (currently MediaPipe). It receives image frames and produces structured landmark data with confidence scores and handedness. If AirOS migrates to a different model, only this module changes — all downstream modules depend on the landmark format, not on MediaPipe specifically.
@@ -109,7 +117,7 @@ The Landmark Stream is the stable contract between Perception and downstream con
 
 ### Recorder
 
-The Recorder is a passive infrastructure module responsible for preserving the original observations emitted by the Perception stage, without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md).
+The Recorder is a passive infrastructure module responsible for preserving the original observations emitted by Camera Capture, without interpretation. Its responsibilities, design philosophy, data schema, and role in replay, benchmarking, debugging, and machine learning are documented in [Engineering Document 03: Recorder and Replay Architecture](engineering/03-recorder-and-replay.md). Note that while Document 03 initially placed the Recorder after Perception, Document 04 formally moved it to fork directly from Camera Capture to resolve queue policy conflicts.
 
 ### Replay
 
