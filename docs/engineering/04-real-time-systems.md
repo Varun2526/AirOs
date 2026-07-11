@@ -202,16 +202,16 @@ During the design review, we established that a `Frame` object should only conta
 ```mermaid
 classDiagram
     class Frame {
-        +ndarray raw_image
-        +float timestamp
-        +int frame_number
+        raw_image
+        timestamp
+        frame_number
     }
     
     class RejectedFields {
         <<Do Not Include>>
-        -String session_id
-        -Tuple resolution
-        -float fps
+        session_id
+        resolution
+        fps
     }
 ```
 
@@ -266,15 +266,15 @@ The Camera Capture module should know as little as possible. It should not know:
 
 ```mermaid
 flowchart TD
+    Cam[Camera Capture] --> Transport[Frame Transport]
+    
     subgraph Unknown to Camera Module
-        Perc[Perception]
+        Perc[Live Processing]
         Rec[Recorder]
-        Gest[Gesture Engine]
     end
     
-    Cam[Camera Capture<br>Producer] -->|Blindly Publishes<br>Frames| Bus((Data Bus / Queues))
-    Bus --> Perc
-    Bus --> Rec
+    Transport --> Perc
+    Transport --> Rec
 ```
 
 Its only responsibility is producing timestamped observations.
