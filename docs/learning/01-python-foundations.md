@@ -1,6 +1,6 @@
-# Engineering Learning Log 01 — Project Setup and Camera Architecture
+# Python Foundations — Frame Design and Core Constructs
 
-> **AirOS Engineering Learning Log**
+> **AirOS Engineering Learning Notes**
 > **Focus:** Environment Setup, Core Python Constructs, and Foundational Module Design
 
 ---

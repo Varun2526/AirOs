@@ -13,6 +13,3 @@ class Frame:
     frame_number: int
     timestamp: float
     image: np.ndarray
-
-
-
