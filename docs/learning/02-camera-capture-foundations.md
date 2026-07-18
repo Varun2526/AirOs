@@ -280,3 +280,7 @@ They walk through a rigorous reasoning process, answering key questions that nat
     *   *Resulting Implementation:* I will implement Python context manager methods (`__enter__` and `__exit__`) to forcefully release the camera upon unexpected exits.
 
 The reader should now recognize that implementation becomes almost mechanical. Because we have mapped out the ownership, lifetime, state, abstractions, and failure modes, writing the Python code for `capture.py` is simply a matter of translating this engineering design into syntax.
+
+
+
+
