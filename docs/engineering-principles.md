@@ -97,3 +97,5 @@ Downstream modules must consume from a common interface. If a module has to ask 
 
 The Replay module should not decide how fast to replay; the caller provides the speed policy. Hardcoding policies inside infrastructure makes the infrastructure rigid and single-use.
 *(Introduced in [Document 03](handbook/03-recorder-and-replay.md))*
+
+
